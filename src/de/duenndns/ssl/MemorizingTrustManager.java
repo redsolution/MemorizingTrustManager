@@ -30,12 +30,14 @@ import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.Application;
 import android.app.Notification;
+import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.support.v4.app.NotificationCompat;
 import android.util.SparseArray;
 import android.os.Build;
 import android.os.Handler;
@@ -75,7 +77,8 @@ import javax.net.ssl.X509TrustManager;
  * opening sockets!
  */
 public class MemorizingTrustManager implements X509TrustManager {
-	final static String DECISION_INTENT = "de.duenndns.ssl.DECISION";
+    final static String NOTIF_CHANNEL_ID       = "MemorizingTrustManager";
+	final static String DECISION_INTENT        = "de.duenndns.ssl.DECISION";
 	final static String DECISION_INTENT_ID     = DECISION_INTENT + ".decisionId";
 	final static String DECISION_INTENT_CERT   = DECISION_INTENT + ".cert";
 	final static String DECISION_INTENT_CHOICE = DECISION_INTENT + ".decisionChoice";
@@ -611,28 +614,22 @@ public class MemorizingTrustManager implements X509TrustManager {
 		final long currentMillis = System.currentTimeMillis();
 		final Context context = master.getApplicationContext();
 
-		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB) {
-			@SuppressWarnings("deprecation")
-			// Use an extra identifier for the legacy build notification, so
-			// that we suppress the deprecation warning. We will latter assign
-			// this to the correct identifier.
-			Notification n  = new Notification(android.R.drawable.ic_lock_lock,
-					mtmNotification,
-					currentMillis);
-			setLatestEventInfoReflective(n, context, mtmNotification, certName, call);
-			n.flags |= Notification.FLAG_AUTO_CANCEL;
-			notification = n;
-		} else {
-			notification = new Notification.Builder(master)
-					.setContentTitle(mtmNotification)
-					.setContentText(certName)
-					.setTicker(certName)
-					.setSmallIcon(android.R.drawable.ic_lock_lock)
-					.setWhen(currentMillis)
-					.setContentIntent(call)
-					.setAutoCancel(true)
-					.getNotification();
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+			NotificationChannel channel = new NotificationChannel(NOTIF_CHANNEL_ID,
+					mtmNotification, android.app.NotificationManager.IMPORTANCE_HIGH);
+			notificationManager.createNotificationChannel(channel);
 		}
+
+		NotificationCompat.Builder builder = new NotificationCompat.Builder(context, NOTIF_CHANNEL_ID);
+		notification = builder
+				.setContentTitle(mtmNotification)
+				.setContentText(certName)
+				.setTicker(certName)
+				.setSmallIcon(android.R.drawable.ic_lock_lock)
+				.setWhen(currentMillis)
+				.setContentIntent(call)
+				.setAutoCancel(true)
+				.build();
 
 		notificationManager.notify(NOTIFICATION_ID + decisionId, notification);
 	}
